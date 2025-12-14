@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"geode/internal/config"
+	"geode/internal/server"
 	"log"
 	"os"
 )
@@ -57,7 +58,10 @@ func runBuild(args []string) {
 	}
 
 	fmt.Println("Building from:", *contentDir)
-	_ = cfg
+	err = server.Rebuild(*contentDir, cfg, false)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func printUsage() {
