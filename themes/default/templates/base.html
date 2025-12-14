@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ .Title }}{{ .Suffix }}</title>
+  </head>
+  <body>
+    <header>
+      <div>{{ .Name }}</div>
+      <nav>{{ .Explorer }}</nav>
+    </header>
+    <main>
+      <article>
+        <h1>{{.Title}}</h1>
+        <ul>
+          {{.Tags}}
+        </ul>
+        <div>
+          <p>{{ .WordCount }} characters</p>
+          <p>{{ .ReadingTime }} minutes</p>
+        </div>
+        {{ .Content }}
+      </article>
+    </main>
+
+    <aside>
+      <div>{{ .Graph }}</div>
+      <div>{{ .Toc }}</div>
+      <div>{{ .Backlinks }}</div>
+    </aside>
+
+    <footer>
+      <div>{{ .Socials }}</div>
+    </footer>
+
+    {{ if .LiveReload }}
+    <script>
+      const evtSource = new EventSource("/_reload");
+      evtSource.onmessage = function () {
+        location.reload();
+      };
+    </script>
+    {{ end }}
+  </body>
+</html>

@@ -1,6 +1,6 @@
 site:
-  title: Geode
-  suffix: ""
+  name: Geode
+  suffix: " - Geode"
   base_url: https://example.com
 
 build:

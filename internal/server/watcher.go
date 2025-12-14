@@ -2,8 +2,10 @@ package server
 
 import (
 	"fmt"
+	"geode/internal/build"
 	"geode/internal/config"
 	"geode/internal/content"
+	"geode/internal/render"
 	"os"
 )
 
@@ -18,7 +20,24 @@ func Rebuild(dir string, cfg *config.Config, live bool) error {
 	}
 
 	filtered := content.FilterEntries(entries, cfg)
-	fmt.Println(len(filtered))
+
+	pages := render.ParsingMarkdown(filtered)
+
+	writer, err := build.NewHTMLWriter(cfg)
+	if err != nil {
+		return fmt.Errorf("init html writer: %w", err)
+	}
+
+	for _, page := range pages {
+		if err := writer.Write(page, live); err != nil {
+			return fmt.Errorf("write html %s: %w", page.RelativePath, err)
+		}
+	}
+
+	// TODO: Build Tags Pages
+	// TODO: Build default directory pages
+	// TODO: Build 404 Pages
+	// TODO: Copy static files
 
 	if live {
 		fmt.Println("Site rebuilt.")

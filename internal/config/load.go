@@ -14,7 +14,7 @@ type Social struct {
 
 type Config struct {
 	Site struct {
-		Title   string `yaml:"title"`
+		Name    string `yaml:"name"`
 		Suffix  string `yaml:"suffix"`
 		BaseURL string `yaml:"base_url"`
 	} `yaml:"site"`
@@ -61,8 +61,8 @@ func Load() (*Config, error) {
 }
 
 func validate(cfg *Config) error {
-	if cfg.Site.Title == "" {
-		return errors.New("site.title is required")
+	if cfg.Site.Name == "" {
+		return errors.New("site.name is required")
 	}
 
 	if cfg.Site.BaseURL == "" {
