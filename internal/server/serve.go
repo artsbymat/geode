@@ -7,30 +7,26 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 func ServePublic(port int) {
 	fs := http.FileServer(http.Dir("public"))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-
-		path = filepath.Clean(path)
+		path := filepath.Clean(r.URL.Path)
 
 		if path == "/" {
 			http.ServeFile(w, r, "public/index.html")
 			return
 		}
 
-		ext := filepath.Ext(path)
+		rel := strings.TrimPrefix(path, "/")
+		htmlPath := filepath.Join("public", rel) + ".html"
 
-		if ext == "" {
-			htmlPath := filepath.Join("public", path) + ".html"
-
-			if _, err := os.Stat(htmlPath); err == nil {
-				http.ServeFile(w, r, htmlPath)
-				return
-			}
+		if fi, err := os.Stat(htmlPath); err == nil && !fi.IsDir() {
+			http.ServeFile(w, r, htmlPath)
+			return
 		}
 
 		fs.ServeHTTP(w, r)
