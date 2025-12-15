@@ -5,78 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ .Title }}{{ .Suffix }}</title>
     <link rel="stylesheet" href="/styles/explorer.css" />
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-      }
-      /* Root */
-      .file-explorer {
-        list-style: none;
-        margin: 0;
-        padding-left: 0;
-        font-size: 14px;
-      }
-
-      /* Nested lists */
-      .file-explorer ul {
-        list-style: none;
-        margin: 4px 0;
-        padding-left: 1em;
-      }
-
-      /* Items */
-      .file-explorer li {
-        line-height: 1.6;
-      }
-
-      /* Folder label */
-      .file-explorer .folder {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4em;
-        cursor: pointer;
-        user-select: none;
-        font-weight: 500;
-      }
-
-      .file-explorer .folder-icon {
-        width: 1em;
-        height: 1em;
-        flex-shrink: 0;
-        transition: transform 0.15s ease;
-      }
-
-      .file-explorer li.open > .folder .folder-icon {
-        transform: rotate(90deg);
-      }
-
-      .file-explorer a {
-        display: inline-block;
-        padding: 2px 4px;
-        border-radius: 4px;
-        text-decoration: none;
-        color: inherit;
-      }
-
-      .file-explorer a:hover {
-        background: rgba(0, 0, 0, 0.05);
-      }
-
-      .file-explorer li > ul {
-        display: none;
-      }
-
-      .file-explorer li.open > ul {
-        display: block;
-      }
-
-      /* Active file */
-      .file-explorer a.active {
-        font-weight: 500;
-        background: rgba(0, 120, 255, 0.12);
-      }
-    </style>
+    <link rel="stylesheet" href="/styles/base.css" />
   </head>
   <body>
     <header>
@@ -119,65 +48,6 @@
       });
     </script>
     {{ end }}
-    <script>
-      document.addEventListener("DOMContentLoaded", () => {
-        const explorer = document.querySelector(".file-explorer");
-        if (!explorer) return;
-
-        const STORAGE_KEY = "geode:explorer:open";
-        const readOpenKeys = () => {
-          try {
-            const raw = sessionStorage.getItem(STORAGE_KEY);
-            if (!raw) return new Set();
-            const arr = JSON.parse(raw);
-            if (!Array.isArray(arr)) return new Set();
-            return new Set(arr.filter((x) => typeof x === "string"));
-          } catch {
-            return new Set();
-          }
-        };
-
-        const writeOpenKeys = (set) => {
-          try {
-            sessionStorage.setItem(
-              STORAGE_KEY,
-              JSON.stringify(Array.from(set)),
-            );
-          } catch {
-            // ignore
-          }
-        };
-
-        const openKeys = readOpenKeys();
-        explorer.querySelectorAll("li[data-node-key]").forEach((li) => {
-          const key = li.getAttribute("data-node-key");
-          if (key && openKeys.has(key)) li.classList.add("open");
-        });
-
-        explorer.addEventListener("click", (e) => {
-          if (!(e.target instanceof Element)) return;
-
-          const folder = e.target.closest(".folder");
-          if (!folder) return;
-
-          if (!explorer.contains(folder)) return;
-
-          const li = folder.parentElement;
-          if (!li) return;
-
-          li.classList.toggle("open");
-
-          const key = li.getAttribute("data-node-key");
-          if (!key) return;
-
-          if (li.classList.contains("open")) {
-            openKeys.add(key);
-          } else {
-            openKeys.delete(key);
-          }
-          writeOpenKeys(openKeys);
-        });
-      });
-    </script>
+    <script src="/scripts/explorer.js"></script>
   </body>
 </html>

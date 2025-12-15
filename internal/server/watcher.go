@@ -135,7 +135,11 @@ func Rebuild(dir string, cfg *config.Config, live bool) error {
 	// TODO: Build default directory pages
 	// TODO: Build 404 Pages
 
-	if err := CopyAssets(filtered, cfg); err != nil {
+	if err := CopyThemeAssets(cfg); err != nil {
+		return err
+	}
+
+	if err := CopyContentAssets(filtered, cfg); err != nil {
 		return err
 	}
 
@@ -157,13 +161,13 @@ func CleanPublicDir() error {
 	return os.MkdirAll("public", 0o755)
 }
 
-func CopyAssets(entries []content.FileEntry, cfg *config.Config) error {
+func CopyContentAssets(entries []content.FileEntry, cfg *config.Config) error {
 	for _, entry := range entries {
 		if !entry.IsAsset {
 			continue
 		}
 
-		if shouldSkipAsset(entry.Path, cfg.IgnorePatterns) {
+		if shouldIgnoreAsset(entry.Path, cfg.IgnorePatterns) {
 			continue
 		}
 
@@ -174,11 +178,7 @@ func CopyAssets(entries []content.FileEntry, cfg *config.Config) error {
 		normalizedPath := utils.PathToSlug(relPathNoExt) + ext
 		destPath := filepath.Join("public", normalizedPath)
 
-		if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
-			return fmt.Errorf("create asset dir: %w", err)
-		}
-
-		if err := copyAssetFile(entry.Path, destPath); err != nil {
+		if err := copyFile(entry.Path, destPath); err != nil {
 			return fmt.Errorf("copy asset %s: %w", entry.RelativePath, err)
 		}
 	}
@@ -186,46 +186,78 @@ func CopyAssets(entries []content.FileEntry, cfg *config.Config) error {
 	return nil
 }
 
-func shouldSkipAsset(path string, patterns []string) bool {
+func CopyThemeAssets(cfg *config.Config) error {
+	srcDir := filepath.Join("themes", cfg.Theme, "assets")
+	return copyDirRecursive(srcDir, "public")
+}
+
+func shouldIgnoreAsset(path string, patterns []string) bool {
 	lowerPath := strings.ToLower(filepath.ToSlash(path))
 	base := filepath.Base(lowerPath)
 
-	for _, raw := range patterns {
-		p := strings.TrimSpace(strings.ToLower(raw))
-		if p == "" {
+	for _, pattern := range patterns {
+		pattern = strings.TrimSpace(strings.ToLower(pattern))
+		if pattern == "" {
 			continue
 		}
 
-		if strings.ContainsAny(p, "*?[") {
-			if ok, _ := filepath.Match(p, base); ok {
+		if strings.ContainsAny(pattern, "*?[") {
+			if matched, _ := filepath.Match(pattern, base); matched {
 				return true
 			}
 			continue
 		}
 
-		if strings.Contains(lowerPath, p) {
+		if strings.Contains(lowerPath, pattern) {
 			return true
 		}
 	}
 	return false
 }
 
-func copyAssetFile(src, dest string) error {
-	srcFile, err := os.Open(src)
+func copyDirRecursive(src, dest string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+
+		targetPath := filepath.Join(dest, rel)
+
+		if info.IsDir() {
+			return os.MkdirAll(targetPath, 0o755)
+		}
+
+		return copyFile(path, targetPath)
+	})
+}
+
+func copyFile(srcFile, destFile string) error {
+	src, err := os.Open(srcFile)
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer src.Close()
 
-	destFile, err := os.Create(dest)
+	err = os.MkdirAll(filepath.Dir(destFile), 0o755)
 	if err != nil {
 		return err
 	}
-	defer destFile.Close()
 
-	if _, err := io.Copy(destFile, srcFile); err != nil {
+	dest, err := os.Create(destFile)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
+
+	_, err = io.Copy(dest, src)
+	if err != nil {
 		return err
 	}
 
-	return destFile.Sync()
+	return dest.Sync()
 }

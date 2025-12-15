@@ -1,0 +1,66 @@
+/* Root */
+.file-explorer {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+  font-size: 14px;
+}
+
+/* Nested lists */
+.file-explorer ul {
+  list-style: none;
+  margin: 4px 0;
+  padding-left: 1em;
+}
+
+/* Items */
+.file-explorer li {
+  line-height: 1.6;
+}
+
+/* Folder label */
+.file-explorer .folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+}
+
+.file-explorer .folder-icon {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.file-explorer li.open > .folder .folder-icon {
+  transform: rotate(90deg);
+}
+
+.file-explorer a {
+  display: inline-block;
+  padding: 2px 4px;
+  border-radius: 4px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.file-explorer a:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.file-explorer li > ul {
+  display: none;
+}
+
+.file-explorer li.open > ul {
+  display: block;
+}
+
+/* Active file */
+.file-explorer a.active {
+  font-weight: 500;
+  background: rgba(0, 120, 255, 0.12);
+}
