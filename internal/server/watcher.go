@@ -6,6 +6,8 @@ import (
 	"geode/internal/config"
 	"geode/internal/content"
 	"geode/internal/render"
+	"geode/internal/utils"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -132,7 +134,10 @@ func Rebuild(dir string, cfg *config.Config, live bool) error {
 	// TODO: Build Tags Pages
 	// TODO: Build default directory pages
 	// TODO: Build 404 Pages
-	// TODO: Copy static files
+
+	if err := CopyAssets(filtered, cfg); err != nil {
+		return err
+	}
 
 	if live {
 		fmt.Println("Site rebuilt.")
@@ -150,4 +155,77 @@ func CleanPublicDir() error {
 	}
 
 	return os.MkdirAll("public", 0o755)
+}
+
+func CopyAssets(entries []content.FileEntry, cfg *config.Config) error {
+	for _, entry := range entries {
+		if !entry.IsAsset {
+			continue
+		}
+
+		if shouldSkipAsset(entry.Path, cfg.IgnorePatterns) {
+			continue
+		}
+
+		ext := filepath.Ext(entry.RelativePath)
+		relPathNoExt := strings.TrimSuffix(entry.RelativePath, ext)
+		relPathNoExt = strings.ReplaceAll(relPathNoExt, "\\", "/")
+
+		normalizedPath := utils.PathToSlug(relPathNoExt) + ext
+		destPath := filepath.Join("public", normalizedPath)
+
+		if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
+			return fmt.Errorf("create asset dir: %w", err)
+		}
+
+		if err := copyAssetFile(entry.Path, destPath); err != nil {
+			return fmt.Errorf("copy asset %s: %w", entry.RelativePath, err)
+		}
+	}
+
+	return nil
+}
+
+func shouldSkipAsset(path string, patterns []string) bool {
+	lowerPath := strings.ToLower(filepath.ToSlash(path))
+	base := filepath.Base(lowerPath)
+
+	for _, raw := range patterns {
+		p := strings.TrimSpace(strings.ToLower(raw))
+		if p == "" {
+			continue
+		}
+
+		if strings.ContainsAny(p, "*?[") {
+			if ok, _ := filepath.Match(p, base); ok {
+				return true
+			}
+			continue
+		}
+
+		if strings.Contains(lowerPath, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func copyAssetFile(src, dest string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	destFile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	if _, err := io.Copy(destFile, srcFile); err != nil {
+		return err
+	}
+
+	return destFile.Sync()
 }
