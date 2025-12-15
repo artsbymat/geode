@@ -43,7 +43,15 @@ func runServe(args []string) {
 	}
 
 	fmt.Printf("Serving %s at http://localhost:%d\n", *contentDir, *port)
-	_ = cfg
+
+	// build once
+	err = server.Rebuild(*contentDir, cfg, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go server.WatchAndRebuild(*contentDir, cfg)
+	server.ServePublic(*port)
 }
 
 func runBuild(args []string) {
