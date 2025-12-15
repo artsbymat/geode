@@ -113,6 +113,10 @@
       evtSource.onmessage = function () {
         location.reload();
       };
+
+      window.addEventListener("beforeunload", () => {
+        evtSource.close();
+      });
     </script>
     {{ end }}
     <script>
