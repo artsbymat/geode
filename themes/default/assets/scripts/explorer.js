@@ -3,6 +3,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!explorer) return;
 
   const STORAGE_KEY = "geode:explorer:open";
+  const SCROLL_KEY = "geode:explorer:scroll";
+
   const readOpenKeys = () => {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -23,11 +25,32 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  const saveScrollPosition = () => {
+    try {
+      sessionStorage.setItem(SCROLL_KEY, explorer.scrollTop.toString());
+    } catch {
+      // ignore
+    }
+  };
+
+  const restoreScrollPosition = () => {
+    try {
+      const scrollPos = sessionStorage.getItem(SCROLL_KEY);
+      if (scrollPos !== null) {
+        explorer.scrollTop = parseInt(scrollPos, 10);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const openKeys = readOpenKeys();
   explorer.querySelectorAll("li[data-node-key]").forEach((li) => {
     const key = li.getAttribute("data-node-key");
     if (key && openKeys.has(key)) li.classList.add("open");
   });
+
+  restoreScrollPosition();
 
   explorer.addEventListener("click", (e) => {
     if (!(e.target instanceof Element)) return;
@@ -52,4 +75,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     writeOpenKeys(openKeys);
   });
+
+  explorer.addEventListener("scroll", saveScrollPosition);
 });

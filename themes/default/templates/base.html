@@ -8,11 +8,16 @@
     <link rel="stylesheet" href="/styles/base.css" />
   </head>
   <body>
-    <header>
-      <div>{{ .Name }}</div>
-      <nav>{{ .Explorer }}</nav>
+    <header class="left-sidebar">
+      <div class="logo">
+        <a href="/">{{ .Name }}</a>
+      </div>
+      <nav>
+        <span>Explorer</span>
+        {{ .Explorer }}
+      </nav>
     </header>
-    <main>
+    <main class="content">
       <article>
         <h1>{{.Title}}</h1>
         <ul>
@@ -26,14 +31,26 @@
       </article>
     </main>
 
-    <aside>
-      <div>{{ .Graph }}</div>
-      <div>{{ .Toc }}</div>
-      <div>{{ .Backlinks }}</div>
+    <aside class="right-sidebar">
+      <div class="graph">
+        <span>Graph</span>
+        {{ .Graph }}
+      </div>
+      <div class="toc">
+        <span>Table of Contents</span>
+        {{ .Toc }}
+      </div>
+      <div class="backlinks">
+        <span>Backlinks</span>
+        {{ .Backlinks }}
+      </div>
     </aside>
 
-    <footer>
-      <div>{{ .Socials }}</div>
+    <footer class="footer">
+      <div class="socials">{{ .Socials }}</div>
+      <div class="copyright">
+        Powered by <a href="https://github.com/artsbymat/geode">Geode</a>
+      </div>
     </footer>
 
     {{ if .LiveReload }}
