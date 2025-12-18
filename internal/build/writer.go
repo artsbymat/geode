@@ -14,19 +14,20 @@ import (
 )
 
 type PageData struct {
-	Name        template.HTML
-	Suffix      template.HTML
-	Title       template.HTML
-	Tags        template.HTML
-	WordCount   template.HTML
-	ReadingTime template.HTML
-	Content     template.HTML
-	Explorer    template.HTML
-	Graph       template.HTML
-	Toc         template.HTML
-	Backlinks   template.HTML
-	Socials     template.HTML
-	LiveReload  bool
+	Name          template.HTML
+	Suffix        template.HTML
+	Title         template.HTML
+	Tags          template.HTML
+	WordCount     template.HTML
+	ReadingTime   template.HTML
+	Content       template.HTML
+	Explorer      template.HTML
+	Graph         template.HTML
+	Toc           template.HTML
+	OutgoingLinks template.HTML
+	Backlinks     template.HTML
+	Socials       template.HTML
+	LiveReload    bool
 }
 
 type HTMLWriter struct {
@@ -62,20 +63,24 @@ func (w *HTMLWriter) Write(page types.MetaMarkdown, liveReload bool, fileTree *t
 		currentPageURL = "/" + utils.PathToSlug(page.RelativePath)
 	}
 
+	outgoingHTML := RenderLinkList(page.OutgoingLinks)
+	backlinksHTML := RenderLinkList(page.Backlinks)
+
 	data := PageData{
-		Name:        template.HTML(w.cfg.Site.Name),
-		Suffix:      template.HTML(w.cfg.Site.Suffix),
-		Title:       template.HTML(page.Title),
-		Tags:        template.HTML(""),
-		WordCount:   template.HTML(strconv.Itoa(page.WordCount)),
-		ReadingTime: template.HTML(strconv.Itoa(page.ReadingTime)),
-		Content:     template.HTML(page.HTML),
-		Explorer:    template.HTML(RenderExplorer(fileTree)),
-		Graph:       template.HTML(""),
-		Toc:         template.HTML(""),
-		Backlinks:   template.HTML(""),
-		Socials:     template.HTML(""),
-		LiveReload:  liveReload,
+		Name:          template.HTML(w.cfg.Site.Name),
+		Suffix:        template.HTML(w.cfg.Site.Suffix),
+		Title:         template.HTML(page.Title),
+		Tags:          template.HTML(""),
+		WordCount:     template.HTML(strconv.Itoa(page.WordCount)),
+		ReadingTime:   template.HTML(strconv.Itoa(page.ReadingTime)),
+		Content:       template.HTML(page.HTML),
+		Explorer:      template.HTML(RenderExplorer(fileTree)),
+		Graph:         template.HTML(""),
+		Toc:           template.HTML(""),
+		OutgoingLinks: template.HTML(outgoingHTML),
+		Backlinks:     template.HTML(backlinksHTML),
+		Socials:       template.HTML(""),
+		LiveReload:    liveReload,
 	}
 
 	file, err := os.Create(outputPath)

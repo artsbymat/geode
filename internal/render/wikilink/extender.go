@@ -8,7 +8,8 @@ import (
 )
 
 type Extender struct {
-	Resolver Resolver
+	Resolver  Resolver
+	Collector *LinkCollector
 }
 
 func (e *Extender) Extend(md goldmark.Markdown) {
@@ -21,7 +22,8 @@ func (e *Extender) Extend(md goldmark.Markdown) {
 	md.Renderer().AddOptions(
 		renderer.WithNodeRenderers(
 			util.Prioritized(&Renderer{
-				Resolver: e.Resolver,
+				Resolver:  e.Resolver,
+				Collector: e.Collector,
 			}, 199),
 		),
 	)

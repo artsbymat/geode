@@ -13,8 +13,9 @@ import (
 )
 
 type Renderer struct {
-	Resolver Resolver
-	hasDest  sync.Map
+	Resolver  Resolver
+	Collector *LinkCollector
+	hasDest   sync.Map
 }
 
 func (r *Renderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
@@ -42,6 +43,10 @@ func (r *Renderer) enter(w util.BufWriter, n *Node, src []byte) (ast.WalkStatus,
 	}
 	if len(dest) == 0 {
 		return ast.WalkContinue, nil
+	}
+
+	if r.Collector != nil {
+		r.Collector.CollectLink(n, dest, src)
 	}
 
 	img := resolveAsImage(n)

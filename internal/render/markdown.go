@@ -19,6 +19,9 @@ import (
 
 func ParsingMarkdown(entries []content.FileEntry) []types.MetaMarkdown {
 	pages := make([]types.MetaMarkdown, 0, len(entries))
+	urlToIndex := make(map[string]int, len(entries))
+	pendingBacklinks := make(map[string][]types.Link)
+	seenBacklinks := make(map[string]map[string]bool) // targetURL -> sourceURL -> seen
 
 	resolver := buildResolver(entries)
 
@@ -39,18 +42,51 @@ func ParsingMarkdown(entries []content.FileEntry) []types.MetaMarkdown {
 			wordCount := CountWords(string(body))
 			readingTime := EstimateReadingTime(wordCount)
 
-			htmlOut := renderToHTML(body, resolver)
+			htmlOut, outgoingLinks := renderToHTML(body, resolver)
 
-			pages = append(pages, types.MetaMarkdown{
-				Path:         entry.Path,
-				RelativePath: entry.RelativePath,
-				Link:         link,
-				Title:        title,
-				Frontmatter:  frontmatter,
-				ReadingTime:  readingTime,
-				WordCount:    wordCount,
-				HTML:         htmlOut,
-			})
+			page := types.MetaMarkdown{
+				Path:          entry.Path,
+				RelativePath:  entry.RelativePath,
+				Link:          link,
+				Title:         title,
+				Frontmatter:   frontmatter,
+				ReadingTime:   readingTime,
+				WordCount:     wordCount,
+				HTML:          htmlOut,
+				OutgoingLinks: outgoingLinks,
+			}
+
+			pages = append(pages, page)
+			pageIndex := len(pages) - 1
+			if link != "" {
+				urlToIndex[link] = pageIndex
+				if pending, ok := pendingBacklinks[link]; ok {
+					pages[pageIndex].Backlinks = append(pages[pageIndex].Backlinks, pending...)
+					delete(pendingBacklinks, link)
+				}
+			}
+
+			sourceLink := types.Link{Title: title, URL: link}
+			for _, out := range outgoingLinks {
+				targetURL := out.URL
+				if targetURL == "" || targetURL == link {
+					continue
+				}
+
+				if _, ok := seenBacklinks[targetURL]; !ok {
+					seenBacklinks[targetURL] = make(map[string]bool)
+				}
+				if seenBacklinks[targetURL][sourceLink.URL] {
+					continue
+				}
+				seenBacklinks[targetURL][sourceLink.URL] = true
+
+				if idx, ok := urlToIndex[targetURL]; ok {
+					pages[idx].Backlinks = append(pages[idx].Backlinks, sourceLink)
+				} else {
+					pendingBacklinks[targetURL] = append(pendingBacklinks[targetURL], sourceLink)
+				}
+			}
 		}
 	}
 
@@ -91,7 +127,9 @@ func buildResolver(entries []content.FileEntry) wikilink.Resolver {
 	}
 }
 
-func renderToHTML(source []byte, resolver wikilink.Resolver) string {
+func renderToHTML(source []byte, resolver wikilink.Resolver) (string, []types.Link) {
+	collector := wikilink.NewLinkCollector(resolver)
+
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
@@ -99,7 +137,8 @@ func renderToHTML(source []byte, resolver wikilink.Resolver) string {
 			extension.Table,
 			extension.TaskList,
 			&wikilink.Extender{
-				Resolver: resolver,
+				Resolver:  resolver,
+				Collector: collector,
 			},
 		),
 		goldmark.WithParserOptions(
@@ -110,10 +149,19 @@ func renderToHTML(source []byte, resolver wikilink.Resolver) string {
 
 	var buf bytes.Buffer
 	if err := md.Convert(source, &buf); err != nil {
-		return ""
+		return "", nil
 	}
 
-	return buf.String()
+	collectedLinks := collector.GetLinks()
+	links := make([]types.Link, len(collectedLinks))
+	for i, link := range collectedLinks {
+		links[i] = types.Link{
+			Title: link.Title,
+			URL:   link.URL,
+		}
+	}
+
+	return buf.String(), links
 }
 
 func extractFrontmatter(src []byte) (map[string]any, []byte) {
@@ -149,11 +197,27 @@ func ExtractTitle(front map[string]any, entry content.FileEntry) string {
 func ExtractPermalink(front map[string]any, entry content.FileEntry) string {
 	if t, ok := front["permalink"]; ok {
 		if s, ok := t.(string); ok {
-			return utils.PathToSlug(s)
+			url := strings.TrimSuffix(utils.PathToSlug(s), ".md")
+			url = strings.TrimSpace(url)
+			if url == "" {
+				return ""
+			}
+			if !strings.HasPrefix(url, "/") {
+				url = "/" + url
+			}
+			return url
 		}
 	}
 
-	return strings.TrimSuffix(utils.PathToSlug(entry.RelativePath), ".md")
+	url := strings.TrimSuffix(utils.PathToSlug(entry.RelativePath), ".md")
+	url = strings.TrimSpace(url)
+	if url == "" {
+		return ""
+	}
+	if !strings.HasPrefix(url, "/") {
+		url = "/" + url
+	}
+	return url
 }
 
 func CountWords(text string) int {
