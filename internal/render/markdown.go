@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
@@ -27,6 +28,7 @@ func ParsingMarkdown(entries []content.FileEntry) []types.MetaMarkdown {
 	seenBacklinks := make(map[string]map[string]bool) // targetURL -> sourceURL -> seen
 
 	resolver := buildResolver(entries)
+	embedIndex := buildEmbedIndex(entries)
 
 	for _, entry := range entries {
 		if entry.IsAsset {
@@ -45,7 +47,7 @@ func ParsingMarkdown(entries []content.FileEntry) []types.MetaMarkdown {
 			wordCount := CountWords(string(body))
 			readingTime := EstimateReadingTime(wordCount)
 
-			htmlOut, outgoingLinks, toc, contentTags := renderToHTML(body, resolver)
+			htmlOut, outgoingLinks, toc, contentTags := renderToHTML(body, resolver, embedIndex, entry.Path)
 			tags := mergeTags(parseFrontmatterTags(frontmatter), contentTags)
 
 			page := types.MetaMarkdown{
@@ -99,6 +101,265 @@ func ParsingMarkdown(entries []content.FileEntry) []types.MetaMarkdown {
 	return pages
 }
 
+type embedResolver struct {
+	Pages         map[string]string
+	ShortestPaths map[string]string
+}
+
+func buildEmbedIndex(entries []content.FileEntry) embedResolver {
+	pages := make(map[string]string)
+	shortestPaths := make(map[string]string)
+	baseNamePaths := make(map[string][]string)
+
+	for _, entry := range entries {
+		if !entry.IsMarkdown {
+			continue
+		}
+
+		key := strings.TrimSuffix(entry.RelativePath, ".md")
+		key = filepath.ToSlash(key)
+		pages[key] = entry.Path
+
+		base := filepath.Base(key)
+		baseNamePaths[base] = append(baseNamePaths[base], key)
+	}
+
+	for base, paths := range baseNamePaths {
+		shortestKey := paths[0]
+		for _, key := range paths {
+			if len(key) < len(shortestKey) {
+				shortestKey = key
+			}
+		}
+		shortestPaths[base] = pages[shortestKey]
+	}
+
+	return embedResolver{Pages: pages, ShortestPaths: shortestPaths}
+}
+
+func (r embedResolver) resolve(target string) (string, bool) {
+	target = strings.TrimSuffix(target, ".md\\")
+	target = strings.TrimSuffix(target, ".md")
+	target = strings.Trim(target, "/")
+	target = filepath.ToSlash(target)
+
+	if dest, ok := r.Pages[target]; ok {
+		return dest, true
+	}
+
+	base := filepath.Base(target)
+	if dest, ok := r.ShortestPaths[base]; ok {
+		return dest, true
+	}
+
+	return "", false
+}
+
+func expandMarkdownEmbeds(src []byte, r embedResolver, rootPath string) []byte {
+	if len(src) == 0 {
+		return src
+	}
+
+	type segment struct {
+		b      []byte
+		i      int
+		onDone func()
+	}
+
+	const maxDepth = 20
+	depth := 0
+
+	includes := map[string]struct{}{rootPath: {}}
+	stack := []segment{{b: src}}
+
+	var out bytes.Buffer
+	out.Grow(len(src))
+
+	for len(stack) > 0 {
+		seg := &stack[len(stack)-1]
+		if seg.i >= len(seg.b) {
+			if seg.onDone != nil {
+				seg.onDone()
+			}
+			stack = stack[:len(stack)-1]
+			continue
+		}
+
+		b := seg.b
+		i := seg.i
+
+		if b[i] != '!' || i+2 >= len(b) || b[i+1] != '[' || b[i+2] != '[' {
+			_ = out.WriteByte(b[i])
+			seg.i++
+			continue
+		}
+
+		j := i + 3
+		for j+1 < len(b) && !(b[j] == ']' && b[j+1] == ']') {
+			j++
+		}
+		if j+1 >= len(b) {
+			_ = out.WriteByte(b[i])
+			seg.i++
+			continue
+		}
+
+		inner := strings.TrimSpace(string(b[i+3 : j]))
+		if inner == "" {
+			_, _ = out.Write(b[i : j+2])
+			seg.i = j + 2
+			continue
+		}
+
+		literal := b[i : j+2]
+
+		if k := strings.IndexByte(inner, '|'); k >= 0 {
+			inner = inner[:k]
+		}
+		inner = strings.TrimSpace(inner)
+
+		target := inner
+		var fragmentID string
+		if before, after, ok := strings.Cut(inner, "#"); ok {
+			target = strings.TrimSpace(before)
+			fragmentID = transformHeadingID(strings.TrimSpace(after))
+		}
+		if target == "" {
+			_, _ = out.Write(literal)
+			seg.i = j + 2
+			continue
+		}
+
+		path, ok := r.resolve(target)
+		if !ok {
+			_, _ = out.Write(literal)
+			seg.i = j + 2
+			continue
+		}
+
+		if _, seen := includes[path]; seen || depth >= maxDepth {
+			seg.i = j + 2
+			continue
+		}
+
+		contentBytes, err := os.ReadFile(path)
+		if err != nil {
+			_, _ = out.Write(literal)
+			seg.i = j + 2
+			continue
+		}
+
+		_, body := extractFrontmatter(contentBytes)
+		if fragmentID != "" {
+			section, ok := extractMarkdownSection(body, fragmentID)
+			if !ok {
+				_, _ = out.Write(literal)
+				seg.i = j + 2
+				continue
+			}
+			body = section
+		}
+		includes[path] = struct{}{}
+		depth++
+
+		seg.i = j + 2
+		stack = append(stack, segment{b: body, onDone: func() {
+			delete(includes, path)
+			depth--
+		}})
+	}
+
+	return out.Bytes()
+}
+
+func extractMarkdownSection(body []byte, fragmentID string) ([]byte, bool) {
+	if fragmentID == "" || len(body) == 0 {
+		return nil, false
+	}
+
+	lines := strings.Split(string(body), "\n")
+
+	startLine := -1
+	startLevel := 0
+
+	for i, line := range lines {
+		level, text, ok := parseATXHeading(line)
+		if !ok {
+			continue
+		}
+		if transformHeadingID(text) == fragmentID {
+			startLine = i
+			startLevel = level
+			break
+		}
+	}
+	if startLine < 0 {
+		return nil, false
+	}
+
+	endLine := len(lines)
+	for i := startLine + 1; i < len(lines); i++ {
+		level, _, ok := parseATXHeading(lines[i])
+		if !ok {
+			continue
+		}
+		if level <= startLevel {
+			endLine = i
+			break
+		}
+	}
+
+	section := strings.Join(lines[startLine:endLine], "\n")
+	return []byte(section), true
+}
+
+func parseATXHeading(line string) (level int, text string, ok bool) {
+	trimmed := strings.TrimLeft(line, " \t")
+	if trimmed == "" || trimmed[0] != '#' {
+		return 0, "", false
+	}
+
+	level = 0
+	for level < len(trimmed) && level < 6 && trimmed[level] == '#' {
+		level++
+	}
+	if level == 0 {
+		return 0, "", false
+	}
+	if level >= len(trimmed) || trimmed[level] != ' ' {
+		return 0, "", false
+	}
+
+	text = strings.TrimSpace(trimmed[level:])
+	text = strings.TrimRight(text, "#")
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return 0, "", false
+	}
+
+	return level, text, true
+}
+
+func transformHeadingID(text string) string {
+	text = strings.TrimSpace(text)
+	text = strings.TrimLeft(text, "#")
+	text = strings.TrimSpace(text)
+
+	var result strings.Builder
+
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			result.WriteRune(unicode.ToLower(r))
+		} else if unicode.IsSpace(r) || r == '-' || r == '_' {
+			result.WriteRune('-')
+		}
+	}
+
+	id := result.String()
+	id = strings.Trim(id, "-")
+	return id
+}
+
 func buildResolver(entries []content.FileEntry) wikilink.Resolver {
 	pages := make(map[string]string)
 	shortestPaths := make(map[string]string)
@@ -133,11 +394,13 @@ func buildResolver(entries []content.FileEntry) wikilink.Resolver {
 	}
 }
 
-func renderToHTML(source []byte, resolver wikilink.Resolver) (string, []types.Link, []types.TocItem, []string) {
+func renderToHTML(source []byte, resolver wikilink.Resolver, embed embedResolver, rootPath string) (string, []types.Link, []types.TocItem, []string) {
 	collector := wikilink.NewLinkCollector(resolver)
 	tagCollector := hashtag.NewCollector()
 	toc := make([]types.TocItem, 0)
 	tagResolver := hashtag.Resolver(tagLinkResolver{})
+
+	source = expandMarkdownEmbeds(source, embed, rootPath)
 
 	md := goldmark.New(
 		goldmark.WithExtensions(
