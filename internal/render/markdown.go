@@ -16,9 +16,11 @@ import (
 	"unicode"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/text"
 	"gopkg.in/yaml.v3"
 )
 
@@ -48,7 +50,7 @@ func ParsingMarkdown(entries []content.FileEntry) []types.MetaMarkdown {
 			wordCount := CountWords(string(body))
 			readingTime := EstimateReadingTime(wordCount)
 
-			htmlOut, outgoingLinks, toc, contentTags := renderToHTML(body, resolver, embedIndex, entry.Path)
+			htmlOut, outgoingLinks, toc, contentTags, hasKatex := renderToHTML(body, resolver, embedIndex, entry.Path)
 			tags := mergeTags(parseFrontmatterTags(frontmatter), contentTags)
 
 			page := types.MetaMarkdown{
@@ -63,6 +65,7 @@ func ParsingMarkdown(entries []content.FileEntry) []types.MetaMarkdown {
 				HTML:            htmlOut,
 				OutgoingLinks:   outgoingLinks,
 				TableOfContents: toc,
+				HasKatex:        hasKatex,
 			}
 
 			pages = append(pages, page)
@@ -395,7 +398,7 @@ func buildResolver(entries []content.FileEntry) wikilink.Resolver {
 	}
 }
 
-func renderToHTML(source []byte, resolver wikilink.Resolver, embed embedResolver, rootPath string) (string, []types.Link, []types.TocItem, []string) {
+func renderToHTML(source []byte, resolver wikilink.Resolver, embed embedResolver, rootPath string) (string, []types.Link, []types.TocItem, []string, bool) {
 	collector := wikilink.NewLinkCollector(resolver)
 	tagCollector := hashtag.NewCollector()
 	toc := make([]types.TocItem, 0)
@@ -426,9 +429,35 @@ func renderToHTML(source []byte, resolver wikilink.Resolver, embed embedResolver
 		goldmark.WithRendererOptions(html.WithUnsafe()),
 	)
 
+	doc := md.Parser().Parse(text.NewReader(source))
+
+	// Check if the document contains katex
+	hasKatex := false
+	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+
+		switch n.Kind() {
+		case ast.KindCodeBlock, ast.KindFencedCodeBlock, ast.KindCodeSpan, ast.KindImage, ast.KindHTMLBlock, ast.KindRawHTML:
+			return ast.WalkSkipChildren, nil
+		case ast.KindText:
+			if hasKatex {
+				return ast.WalkStop, nil
+			}
+			text := n.(*ast.Text).Segment.Value(source)
+			s := string(text)
+			if strings.Contains(s, "$") || strings.Contains(s, "\\(") || strings.Contains(s, "\\[") {
+				hasKatex = true
+				return ast.WalkStop, nil
+			}
+		}
+		return ast.WalkContinue, nil
+	})
+
 	var buf bytes.Buffer
-	if err := md.Convert(source, &buf); err != nil {
-		return "", nil, nil, nil
+	if err := md.Renderer().Render(&buf, source, doc); err != nil {
+		return "", nil, nil, nil, false
 	}
 
 	collectedLinks := collector.GetLinks()
@@ -440,7 +469,7 @@ func renderToHTML(source []byte, resolver wikilink.Resolver, embed embedResolver
 		}
 	}
 
-	return buf.String(), links, toc, tagCollector.Tags()
+	return buf.String(), links, toc, tagCollector.Tags(), hasKatex
 }
 
 type tagLinkResolver struct{}

@@ -24,4 +24,5 @@ type MetaMarkdown struct {
 	OutgoingLinks   []Link
 	Backlinks       []Link
 	TableOfContents []TocItem
+	HasKatex        bool
 }
