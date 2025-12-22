@@ -5,6 +5,7 @@ import (
 	"geode/internal/content"
 	"geode/internal/render/anchor"
 	"geode/internal/render/callout"
+	"geode/internal/render/externallink"
 	"geode/internal/render/highlight"
 	"geode/internal/render/mark"
 	"geode/internal/render/media"
@@ -434,6 +435,7 @@ func renderToHTML(source []byte, resolver wikilink.Resolver, embed embedResolver
 			&callout.Extender{},
 			&anchor.Extender{},
 			&mark.Extender{},
+			&externallink.Extender{},
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
