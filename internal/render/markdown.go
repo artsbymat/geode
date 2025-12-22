@@ -3,6 +3,7 @@ package render
 import (
 	"bytes"
 	"geode/internal/content"
+	"geode/internal/render/callout"
 	"geode/internal/render/highlight"
 	"geode/internal/render/media"
 	"geode/internal/render/mermaid"
@@ -428,6 +429,7 @@ func renderToHTML(source []byte, resolver wikilink.Resolver, embed embedResolver
 			},
 			&mermaid.Extender{},
 			&highlight.Extender{},
+			&callout.Extender{},
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),

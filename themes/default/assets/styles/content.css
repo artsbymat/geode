@@ -88,24 +88,26 @@
 }
 
 /* Blockquotes */
-.content blockquote {
+.content blockquote:not(.callout):not(.callout blockquote) {
   margin: 1rem 0;
   padding: 0 1em;
-  color: var(--color-fg-muted);
+  color: var(--color-fg-default);
   border-left: 0.25em solid var(--color-border-default);
 }
 
 /* Code */
-.content code {
+.content :not(pre) > code {
   font-family: "JetBrains Mono", monospace;
   padding: 0.2em 0.4em;
-  margin: 0;
-  font-size: 85%;
-  border-radius: 8px;
   background-color: var(--color-canvas-subtle);
+  border-radius: 4px;
 }
 
-.content pre {
+.content .code-block {
+  position: relative;
+}
+
+.content .code-block pre {
   padding: 1rem;
   overflow: auto;
   line-height: 1.45;
@@ -114,8 +116,8 @@
   margin-bottom: 1rem;
 }
 
-.content .code-block {
-  position: relative;
+.content .code-block pre code {
+  font-family: "JetBrains Mono", monospace;
 }
 
 .content .code-block .copy-btn {
