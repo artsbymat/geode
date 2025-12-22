@@ -415,6 +415,7 @@ func renderToHTML(source []byte, resolver wikilink.Resolver, embed embedResolver
 			extension.Strikethrough,
 			extension.Table,
 			extension.TaskList,
+			extension.Footnote,
 			&media.Extender{},
 			&wikilink.Extender{
 				Resolver:  resolver,
