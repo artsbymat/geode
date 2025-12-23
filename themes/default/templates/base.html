@@ -44,7 +44,7 @@
     </script>
     {{ end }}
   </head>
-  <body>
+  <body class="{{ range .CSSClasses }}{{ . }} {{ end }}">
     <header class="left-sidebar">
       <div class="logo">
         <a href="/">{{ .Name }}</a>

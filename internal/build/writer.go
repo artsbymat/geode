@@ -31,6 +31,7 @@ type PageData struct {
 	HasMermaid    bool
 	HasTwitter    bool
 	LiveReload    bool
+	CSSClasses    []string
 }
 
 type HTMLWriter struct {
@@ -92,6 +93,7 @@ func (w *HTMLWriter) Write(page types.MetaMarkdown, liveReload bool, fileTree *t
 		HasMermaid:    page.HasMermaid,
 		HasTwitter:    strings.Contains(page.HTML, `blockquote class="twitter-tweet"`),
 		LiveReload:    liveReload,
+		CSSClasses:    parseCSSClasses(page.Frontmatter),
 	}
 
 	file, err := os.Create(outputPath)
@@ -101,4 +103,31 @@ func (w *HTMLWriter) Write(page types.MetaMarkdown, liveReload bool, fileTree *t
 	defer file.Close()
 
 	return w.tmpl.Execute(file, data)
+}
+
+func parseCSSClasses(front map[string]any) []string {
+	v, ok := front["cssclasses"]
+	if !ok || v == nil {
+		return nil
+	}
+
+	var out []string
+	switch vv := v.(type) {
+	case []string:
+		out = vv
+	case []any:
+		for _, it := range vv {
+			if s, ok := it.(string); ok {
+				out = append(out, s)
+			}
+		}
+	case string:
+		for _, s := range strings.Split(vv, " ") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
 }
