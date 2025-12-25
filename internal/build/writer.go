@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"geode/internal/config"
 	"geode/internal/types"
@@ -34,6 +35,7 @@ type PageData struct {
 	CSSClasses    []string
 	Description   string
 	Keywords      []string
+	Date          template.HTML
 }
 
 type HTMLWriter struct {
@@ -76,6 +78,24 @@ func (w *HTMLWriter) Write(page types.MetaMarkdown, liveReload bool, fileTree *t
 
 	graphData := BuildGraph(page)
 	graphHTML := RenderGraphView(graphData, currentPageURL)
+	date := time.Now().Format("2006-01-02")
+
+	// modified -> created -> now
+	if v, ok := page.Frontmatter["modified"]; ok {
+		switch t := v.(type) {
+		case time.Time:
+			date = t.Format("2006-01-02")
+		case string:
+			date = t
+		}
+	} else if v, ok := page.Frontmatter["created"]; ok {
+		switch t := v.(type) {
+		case time.Time:
+			date = t.Format("2006-01-02")
+		case string:
+			date = t
+		}
+	}
 
 	data := PageData{
 		Name:          template.HTML(w.cfg.Site.Name),
@@ -98,6 +118,7 @@ func (w *HTMLWriter) Write(page types.MetaMarkdown, liveReload bool, fileTree *t
 		CSSClasses:    parseCSSClasses(page.Frontmatter),
 		Description:   page.Description,
 		Keywords:      parseKeywords(page.Frontmatter),
+		Date:          template.HTML(date),
 	}
 
 	file, err := os.Create(outputPath)
