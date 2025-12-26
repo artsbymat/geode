@@ -226,13 +226,30 @@
         end
         }}
       >
-        <h1>{{.Title}}</h1>
+        <h1 data-pagefind-meta="title">{{ .Title }}</h1>
+
         <div class="metadata">
-          <p>{{ .Date }}</p>
-          <p>{{ .WordCount }} characters</p>
-          <p>{{ .ReadingTime }} minutes</p>
-          {{.Tags}}
+          {{ if .Aliases }}
+          <p data-pagefind-meta="aliases:{{ .Aliases }}" class="sr-only">
+            {{ .Aliases }}
+          </p>
+          {{ end }} {{ if .Date }}
+          <p data-pagefind-meta="date:{{ .Date }}">{{ .Date }}</p>
+          {{ end }} {{ if .WordCount }}
+          <p data-pagefind-meta="wordcount:{{ .WordCount }}">
+            {{ .WordCount }} characters
+          </p>
+          {{ end }} {{ if .ReadingTime }}
+          <p data-pagefind-meta="readingtime:{{ .ReadingTime }}">
+            {{ .ReadingTime }} minutes
+          </p>
+          {{ end }} {{ if .Tags }}
+          <ul data-pagefind-meta="tags:{{ .Tags }}" class="tag-list">
+            {{.Tags}}
+          </ul>
+          {{ end }}
         </div>
+
         {{ .Content }}
       </article>
     </main>

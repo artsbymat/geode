@@ -37,6 +37,7 @@ type PageData struct {
 	Keywords      []string
 	Date          template.HTML
 	Pagefind      bool
+	Aliases       template.HTML
 }
 
 type HTMLWriter struct {
@@ -128,6 +129,7 @@ func (w *HTMLWriter) Write(page types.MetaMarkdown, liveReload bool, fileTree *t
 		Keywords:      parseKeywords(page.Frontmatter),
 		Date:          template.HTML(date),
 		Pagefind:      pagefind,
+		Aliases:       template.HTML(strings.Join(parseAliases(page.Frontmatter), ", ")),
 	}
 
 	file, err := os.Create(outputPath)
@@ -184,6 +186,33 @@ func parseKeywords(front map[string]any) []string {
 		}
 	case string:
 		for _, s := range strings.Split(vv, " ") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
+}
+
+func parseAliases(front map[string]any) []string {
+	v, ok := front["aliases"]
+	if !ok || v == nil {
+		return nil
+	}
+
+	var out []string
+	switch vv := v.(type) {
+	case []string:
+		out = vv
+	case []any:
+		for _, it := range vv {
+			if s, ok := it.(string); ok {
+				out = append(out, s)
+			}
+		}
+	case string:
+		for _, s := range strings.Split(vv, ",") {
 			s = strings.TrimSpace(s)
 			if s != "" {
 				out = append(out, s)

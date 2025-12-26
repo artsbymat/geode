@@ -12,7 +12,6 @@ func RenderTags(tags []string) string {
 	}
 
 	var b strings.Builder
-	b.WriteString(`<ul class="tag-list">`)
 	first := true
 	for _, t := range tags {
 		t = strings.TrimSpace(t)
@@ -31,7 +30,6 @@ func RenderTags(tags []string) string {
 		b.WriteString(template.HTMLEscapeString(t))
 		b.WriteString(`</a></li>`)
 	}
-	b.WriteString(`</ul>`)
 
 	return b.String()
 }

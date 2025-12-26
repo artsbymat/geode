@@ -231,6 +231,10 @@
   text-decoration: none;
 }
 
+.content .metadata .sr-only {
+  display: none;
+}
+
 .content .metadata a:hover {
   color: var(--color-accent-fg);
   text-decoration: underline;

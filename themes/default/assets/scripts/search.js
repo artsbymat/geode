@@ -23,6 +23,10 @@ window.addEventListener("DOMContentLoaded", (event) => {
     autoFocus: true,
     processResult: function (result) {
       result.url = result.url.replace(".html", "");
+      result.raw_url = result.raw_url.replace(".html", "");
+      result.sub_results.map((sub_result) => {
+        sub_result.url = sub_result.url.replace(".html", "");
+      });
       return result;
     },
   });
