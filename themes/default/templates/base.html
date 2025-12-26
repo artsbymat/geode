@@ -213,7 +213,19 @@
       </div>
     </header>
     <main class="content">
-      <article data-pagefind-body>
+      <article
+        {{
+        if
+        .Pagefind
+        }}
+        data-pagefind-body{{
+        else
+        }}
+        data-pagefind-ignore
+        {{
+        end
+        }}
+      >
         <h1>{{.Title}}</h1>
         <div class="metadata">
           <p>{{ .Date }}</p>

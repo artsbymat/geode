@@ -36,6 +36,7 @@ type PageData struct {
 	Description   string
 	Keywords      []string
 	Date          template.HTML
+	Pagefind      bool
 }
 
 type HTMLWriter struct {
@@ -97,6 +98,13 @@ func (w *HTMLWriter) Write(page types.MetaMarkdown, liveReload bool, fileTree *t
 		}
 	}
 
+	pagefind := true
+	if v, ok := page.Frontmatter["pagefind"]; ok {
+		if b, ok := v.(bool); ok {
+			pagefind = b
+		}
+	}
+
 	data := PageData{
 		Name:          template.HTML(w.cfg.Site.Name),
 		Suffix:        template.HTML(w.cfg.Site.Suffix),
@@ -119,6 +127,7 @@ func (w *HTMLWriter) Write(page types.MetaMarkdown, liveReload bool, fileTree *t
 		Description:   page.Description,
 		Keywords:      parseKeywords(page.Frontmatter),
 		Date:          template.HTML(date),
+		Pagefind:      pagefind,
 	}
 
 	file, err := os.Create(outputPath)
